@@ -1,0 +1,6 @@
+[
+      {"command": "/remindme + time + action", "description": "Установить напоминание"},
+      {"command": "/list", "description": "Показать все предстоящие напоминания"},
+      {"command": "/del + id", "description": "Удалить ненужное напоминание"},
+      {"command": "/help", "description": "Показать это сообщение"}
+]
