@@ -12,11 +12,23 @@ type Reminder struct {
 	ID       string    `bson:"_id,omitempty"`
 	ChatID   int64     `bson:"chat_id"`
 	Action   string    `bson:"action"`
-	Time     time.Time `bson:"time"`
-	IsActive bool      `bson:"is_active"` // Новое поле для отслеживания статуса
+	Time     time.Time `bson:"utc_time"`
+	OriginalTime time.Time `bson:"time"`
+	IsActive bool      `bson:"is_active"`
 }
 
 type Command struct {
     Command     string `json:"command"`
     Description string `json:"description"`
+}
+
+type ChatTimezone struct{
+	ChatID int64 `bson:"chat_id"`
+	Latitude float64 `bson:"lat"`
+	Longitude float64 `bson:"long"`
+}
+
+type UserPageState struct {
+    ChatID int64 `bson:"chat_id"`
+    Page   int   `bson:"page"`
 }

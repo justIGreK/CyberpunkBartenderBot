@@ -22,14 +22,17 @@ func main() {
 	config.LoadEnv()
 	mongodb := storage.CreateMongoClient(ctx)
 	err := mongodb.Ping(ctx, readpref.Primary())
-	if err!=nil{
+	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	bot, err := telego.NewBot(os.Getenv("BOT_TOKEN"), telego.WithDefaultDebugLogger())
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+	if err != nil {
+		log.Fatalf("Failed to set commands: %s", err)
 	}
 	updates, _ := bot.UpdatesViaLongPolling(nil)
 	bh, _ := th.NewBotHandler(bot, updates)
