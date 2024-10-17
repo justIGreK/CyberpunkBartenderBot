@@ -5,6 +5,7 @@ import (
 	"JillBot/cmd/handler"
 	"JillBot/internal/service"
 	"JillBot/internal/storage"
+	"JillBot/pkg/ipgeolocation"
 	"context"
 	"fmt"
 	"log"
@@ -39,10 +40,10 @@ func main() {
 	defer mongodb.Disconnect(ctx)
 	defer bh.Stop()
 	defer bot.StopLongPolling()
-
-	remindersdb := mongodb.Database("remindersdb")
-	store := storage.NewForumStorage(remindersdb, mongodb)
-	botSRV := service.NewBotService(store)
+	collections := []string{"reminders","timezones", "pagestate"}
+	store := storage.NewRemindersStorage(mongodb, "remindersdb", collections)
+	var timeDiffApi ipgeolocation.TimeDiffGetter
+	botSRV := service.NewBotService(store, timeDiffApi)
 	h := handler.NewHandler(bh, botSRV)
 	h.InitRoutes()
 	go h.StartCheckingReminders(bot)

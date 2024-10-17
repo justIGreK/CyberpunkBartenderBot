@@ -26,6 +26,7 @@ type ChatTimezone struct{
 	ChatID int64 `bson:"chat_id"`
 	Latitude float64 `bson:"lat"`
 	Longitude float64 `bson:"long"`
+	Diff_hour int `bson:"diff_hour"`
 }
 
 type UserPageState struct {

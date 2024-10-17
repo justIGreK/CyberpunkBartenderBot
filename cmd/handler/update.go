@@ -12,7 +12,6 @@ import (
 func (h *Handler) StartCheckingReminders(bot *telego.Bot) {
 
 	for {
-		setTimer()
 		reminders, err := h.BotSrv.GetUpcomingReminders(context.TODO())
 		if err != nil {
 			log.Printf("Ошибка при получении напоминаний: %v", err)
@@ -35,6 +34,7 @@ func (h *Handler) StartCheckingReminders(bot *telego.Bot) {
 				log.Printf("Ошибка при обновлении статуса напоминания: %v", err)
 			}
 		}
+		setTimer()
 	}
 }
 

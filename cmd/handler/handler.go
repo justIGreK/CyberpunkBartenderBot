@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"JillBot/internal/models"
 	"JillBot/internal/service"
 	"context"
 	"log"
@@ -11,26 +10,17 @@ import (
 	tu "github.com/mymmrac/telego/telegoutil"
 )
 
-type BotSrv interface {
-	SetTimezone(ctx context.Context, chatID int64, lat, long float64)
-	DeleteTimezone(ctx context.Context, chatID int64) bool
-	GetTimezone(ctx context.Context, chatID int64) (models.ChatTimezone, error)
-	RemindMe(msg *telego.Message, tz models.ChatTimezone) (string, error)
-	GetList(msg *telego.Message) (string, error)
-	DeleteReminder(ctx context.Context, msg *telego.Message) (string, error)
-	HelpCommand() (string, error)
-	GetUpcomingReminders(ctx context.Context) ([]models.Reminder, error)
-	MarkReminderAsSent(ctx context.Context, chatID int64, id string) error
-	SetUserPage(ctx context.Context, chatID int64, page int) error
-	GetUserPage(ctx context.Context, chatID int64) int
-	GetListByPage(chatID int64, page int) (string, error)
+//go:generate mockgen -source=handler.go -destination=mocks/mock.go
+
+type BotHandler interface {
+	Handle(handler th.Handler, predicates ...th.Predicate)
 }
 type Handler struct {
-	BotHandler *th.BotHandler
-	BotSrv
+	BotHandler
+	service.BotSrv
 }
 
-func NewHandler(bh *th.BotHandler, botSRV *service.BotSevice) *Handler {
+func NewHandler(bh *th.BotHandler, botSRV service.BotSrv) *Handler {
 
 	return &Handler{BotHandler: bh, BotSrv: botSRV}
 }
@@ -50,9 +40,15 @@ func (h *Handler) InitRoutes() {
 
 	h.BotHandler.Handle(func(bot *telego.Bot, update telego.Update) { // Настройка таймзоны
 		chatID := tu.ID(update.Message.Chat.ID)
-		h.BotSrv.SetTimezone(context.TODO(), update.Message.Chat.ID, update.Message.Location.Latitude, update.Message.Location.Longitude)
+		err := h.BotSrv.SetTimezone(context.TODO(), update.Message.Chat.ID, update.Message.Location.Latitude, update.Message.Location.Longitude)
+		var text string
+		if err != nil {
+			text = "Упс, что-то пошло не так"
+		} else {
+			text = "Хорошо, я запомнила"
+		}
 		response := telego.SendMessageParams{
-			Text:   "Хорошо, я запомнила",
+			Text:   text,
 			ChatID: chatID,
 		}
 		bot.SendMessage(&response)
@@ -64,9 +60,9 @@ func (h *Handler) InitRoutes() {
 	})
 
 	h.BotHandler.Handle(func(bot *telego.Bot, update telego.Update) { // Удаление часового пояса
-		isDelete := h.BotSrv.DeleteTimezone(context.TODO(), update.Message.Chat.ID)
+		isDeleted := h.BotSrv.DeleteTimezone(context.TODO(), update.Message.Chat.ID)
 		var text string
-		if isDelete {
+		if isDeleted {
 			text = "Успешно забыто"
 		} else {
 			text = "Что то пошло не так"
@@ -90,7 +86,7 @@ func (h *Handler) InitRoutes() {
 			bot.SendMessage(&response)
 			return
 		}
-		text, err := h.BotSrv.RemindMe(update.Message, tz)
+		text, err := h.BotSrv.RemindMe(update.Message.Chat.ID, update.Message.Text, tz)
 		response := telego.SendMessageParams{
 			ChatID: chatID,
 		}
@@ -103,24 +99,24 @@ func (h *Handler) InitRoutes() {
 
 	}, th.CommandEqual("remindme"))
 
-	h.BotHandler.Handle(func(bot *telego.Bot, update telego.Update) { // Получение списка напоминаний
-		text, err := h.BotSrv.GetList(update.Message)
-		chatID := tu.ID(update.Message.Chat.ID)
-		response := telego.SendMessageParams{
-			ChatID: chatID,
-		}
-		if err != nil {
-			response.Text = "Упс, " + err.Error()
-		} else {
-			response.Text = text
-		}
-		bot.SendMessage(&response)
+	// h.BotHandler.Handle(func(bot *telego.Bot, update telego.Update) { // Получение списка напоминаний
+	// 	text, err := h.BotSrv.GetList(update.Message)
+	// 	chatID := tu.ID(update.Message.Chat.ID)
+	// 	response := telego.SendMessageParams{
+	// 		ChatID: chatID,
+	// 	}
+	// 	if err != nil {
+	// 		response.Text = "Упс, " + err.Error()
+	// 	} else {
+	// 		response.Text = text
+	// 	}
+	// 	bot.SendMessage(&response)
 
-	}, th.CommandEqual("list"))
+	// }, th.CommandEqual("list"))
 
 	h.BotHandler.Handle(func(bot *telego.Bot, update telego.Update) { // Удаление напоминания
 
-		text, err := h.BotSrv.DeleteReminder(context.TODO(), update.Message)
+		text, err := h.BotSrv.DeleteReminder(context.TODO(), update.Message.Chat.ID, update.Message.Text)
 		chatID := tu.ID(update.Message.Chat.ID)
 		response := telego.SendMessageParams{
 			ChatID: chatID,
@@ -169,8 +165,10 @@ func (h *Handler) InitRoutes() {
 			WithReplyMarkup(buttons)
 
 		bot.SendMessage(msg)
-	}, th.CommandEqual("AYO"))
+	}, th.CommandEqual("list"))
 	h.BotHandler.Handle(func(bot *telego.Bot, update telego.Update) {
+		// txt := update.EditedMessage
+		// fmt.Println(txt)
 		callbackData := update.CallbackQuery.Data
 		chat := update.CallbackQuery.Message
 		var pageUpdate int

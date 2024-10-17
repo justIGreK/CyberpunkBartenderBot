@@ -15,20 +15,22 @@ func (r *RemindersStorage) GetTimezone(ctx context.Context, chatID int64) (model
 	}
 	return tz, nil
 }
-func (r *RemindersStorage) AddTimezone(ctx context.Context, chatID int64, lat, long float64) error {
+func (r *RemindersStorage) AddTimezone(ctx context.Context, chatID int64, lat, long float64, diffhour int) error {
 	tz := models.ChatTimezone{
 		ChatID:   chatID,
 		Latitude: lat,
 		Longitude: long,
+		Diff_hour: diffhour,
 	}
 	_, err := r.ChatTimezones.InsertOne(ctx, tz)
 	return err
 }
-func (r *RemindersStorage) UpdateTimezone(ctx context.Context, chatID int64, lat, long float64) error {
+func (r *RemindersStorage) UpdateTimezone(ctx context.Context, chatID int64, lat, long float64, diffhour int) error {
 	updateTZ := bson.M{
 		"$set": bson.M{
 			"lat": lat,
 			"long": long,
+			"diff_hour": diffhour,
 		},
 	}
 	filter := bson.M{"chat_id": chatID}

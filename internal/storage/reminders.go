@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -12,19 +13,31 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+//go:generate mockgen -source=reminders.go -destination=mocks/mock.go
+type Store interface {
+	AddReminder(ctx context.Context, reminder models.Reminder) error
+	GetReminders(ctx context.Context, chatID int64) ([]models.Reminder, error)
+	GetUpcomingReminders(ctx context.Context) ([]models.Reminder, error)
+	MarkReminderAsInactive(ctx context.Context, chatID int64, id string) (int64, error)
+	GetTimezone(ctx context.Context, chatID int64) (models.ChatTimezone, error)
+	UpdateTimezone(ctx context.Context, chatID int64, lat, long float64, diffhour int) error
+	AddTimezone(ctx context.Context, chatID int64, lat, long float64, diffhour int) error
+	DeleteTimezone(ctx context.Context, chatID int64) error
+	SetUserPage(ctx context.Context, chatID int64, page int) error
+	GetUserPage(ctx context.Context, chatID int64) int
+}
+
 type RemindersStorage struct {
 	Reminders     *mongo.Collection
 	ChatTimezones *mongo.Collection
 	PageState     *mongo.Collection
-	Client        *mongo.Client
 }
 
-func NewForumStorage(db *mongo.Database, client *mongo.Client) *RemindersStorage {
+func NewRemindersStorage(client *mongo.Client, dbname string, collectionnames []string) *RemindersStorage {
 	return &RemindersStorage{
-		Reminders:     db.Collection("reminders"),
-		ChatTimezones: db.Collection("timezones"),
-		PageState:     db.Collection("pagestate"),
-		Client:        client,
+		Reminders:     client.Database(dbname).Collection(collectionnames[0]),
+		ChatTimezones: client.Database(dbname).Collection(collectionnames[1]),
+		PageState:     client.Database(dbname).Collection(collectionnames[2]),
 	}
 }
 
@@ -44,7 +57,7 @@ func (r *RemindersStorage) GetUpcomingReminders(ctx context.Context) ([]models.R
 	if err != nil {
 		return nil, err
 	}
-
+	defer cursor.Close(ctx)
 	var reminders []models.Reminder
 	if err := cursor.All(ctx, &reminders); err != nil {
 		return nil, err
@@ -78,7 +91,6 @@ func (r *RemindersStorage) GetReminders(ctx context.Context, chatID int64) ([]mo
 		"chat_id":   chatID,
 		"is_active": true,
 	}
-
 	cursor, err := r.Reminders.Find(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -86,14 +98,10 @@ func (r *RemindersStorage) GetReminders(ctx context.Context, chatID int64) ([]mo
 	defer cursor.Close(ctx)
 
 	var reminders []models.Reminder
-	for cursor.Next(ctx) {
-		var reminder models.Reminder
-		err := cursor.Decode(&reminder)
-		if err != nil {
-			return nil, err
-		}
-		reminders = append(reminders, reminder)
+	err = cursor.All(ctx, &reminders)
+	if err != nil {
+		log.Println(err)
+		return nil, err
 	}
-
 	return reminders, nil
 }
